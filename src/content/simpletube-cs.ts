@@ -3,16 +3,18 @@ import { browser } from "webextension-polyfill-ts";
 import { getExtensionRunning } from "../util/extensionRunning";
 import { getSettings } from "../util/settingsHandler";
 import { getSectionsRemovedPage, getSectionsRemovedTotal, setSectionsRemovedPage, setSectionsRemovedTotal } from "../util/sectionsRemoved";
+import { clearPageChangeStore, incremementPageChangeStore } from "../util/pageChangeStore";
 import { checkScrollDirectionIsUp } from "../util/checkScollDirection";
 import { throttle } from "../util/helpers"
 
 //MARK: START OF REMOVING FUNCTIONS
 
 // General remove element function
-const generalRemoveElement = (elementName:string, sucessMsg:string, errorMsg:string, customSectionUpdates?:Function) => {
+const generalRemoveElement = (elementName:string, sucessMsg:string, errorMsg:string, type?:string, customSectionUpdates?:Function):number => {
 
   const elements = document.querySelectorAll(elementName);
   const elementsArray = [...elements];
+  let status;
 
   elementsArray.forEach(div => {
     
@@ -20,18 +22,22 @@ const generalRemoveElement = (elementName:string, sucessMsg:string, errorMsg:str
       if (div.firstChild) { div.parentNode.removeChild(div) }
 
       if (!customSectionUpdates) {
-        updateSectionsRemoveCount();
+        updateSectionsRemoveCount(type);
         handleSectionRemovedChange();        
       } else {
         customSectionUpdates();
       }
 
       console.log(sucessMsg);
+      status = 1;
     } catch (error) {
       console.warn(`${errorMsg}: ${error}`);
+      status = 0;
     }
     
   });
+
+  return status;
 
 }
 
@@ -51,7 +57,7 @@ const removeShortsWhileWatching = () => {
         shortsElement.parentNode.removeChild(shortsElement);
       }
 
-      updateSectionsRemoveCount();
+      updateSectionsRemoveCount("removeShortsWhileWatching");
       handleSectionRemovedChange();      
 
       console.log("Shorts section removed");
@@ -64,21 +70,26 @@ const removeShortsWhileWatching = () => {
 // Remove Shorts on search page
 const removeShortsFromSearch = () => {
   if (window.location.href.includes("https://www.youtube.com/results")) {
-      generalRemoveElement('ytd-reel-shelf-renderer', "Shorts removed", "Error removing shorts");
+      generalRemoveElement('ytd-reel-shelf-renderer', "Shorts removed", "Error removing shorts", "removeShortsFromSearch");
   }
 }
 
 // Remove Shorts from the whole site
 const removeShortsFromSite = () => {
   generalRemoveElement('[title="Shorts"]', "Shorts nav icon Removed", "Error removing Shorts nav icon");
-  generalRemoveElement('ytd-rich-section-renderer', "Shorts section removed", "Error removing Shorts section");
+  generalRemoveElement('ytd-rich-section-renderer', "Shorts section removed", "Error removing Shorts section", "removeShortsFromSite");
 }
 
 // Prevent Shorts Playback
 const preventShortsPlayback = () => {
-  generalRemoveElement('ytd-reel-video-renderer', "Individual short removed", "Error removing short");
-  generalRemoveElement('div.action-container', "Shorts Playback Prevented", "Error preventing Shorts playback", () => { return null });
-  generalRemoveElement('ytd-shorts', "Shorts Playback Prevented", "Error preventing Shorts playback", () => { return null });
+  let removeAttemptOne = generalRemoveElement('ytd-reel-video-renderer', "Individual short removed", "Error removing short", "", () => {});
+  let removeAttemptTwo = generalRemoveElement('div.action-container', "Shorts Playback Prevented", "Error preventing Shorts playback", "", () => {});
+  let removeAttemptThree = generalRemoveElement('ytd-shorts', "Shorts Playback Prevented", "Error preventing Shorts playback", "", () => {});
+
+  if (removeAttemptOne || removeAttemptTwo || removeAttemptThree) {
+    updateSectionsRemoveCount("removeShortsPlayback");
+    handleSectionRemovedChange();
+  }
 }
 
 // Remove ad slots on search page
@@ -96,7 +107,7 @@ const removeAdsFromReccomendations = () => {
         div.parentNode.removeChild(div);
       }
 
-      updateSectionsRemoveCount();
+      updateSectionsRemoveCount("removeAdsFromReccomendations");
       handleSectionRemovedChange();      
 
       console.log("Ad removed");
@@ -119,7 +130,7 @@ const removeNewChannelsFromSearch = () => {
       if (span.innerText.includes("Channels new to you")) {
         try {
           if (div.firstChild) { div.parentNode.removeChild(div) }
-          updateSectionsRemoveCount();
+          updateSectionsRemoveCount("removeNewChannelsFromSearch");
           handleSectionRemovedChange();          
 
           console.log("New Channels section removed");
@@ -144,7 +155,7 @@ const removeLatestPostsFromSearch = () => {
       if (span.innerText.includes("Latest posts from")) {
         try {
           if (div.firstChild) { div.parentNode.removeChild(div) }
-          updateSectionsRemoveCount();
+          updateSectionsRemoveCount("removeLatestPostsFromSearch");
           handleSectionRemovedChange();          
 
           console.log("Latest posts section removed");
@@ -169,7 +180,7 @@ const removeLatestVideosFromSearch = () => {
       if (span.innerText.includes("Latest from")) {
         try {
           if (div.firstChild) { div.parentNode.removeChild(div) }
-          updateSectionsRemoveCount();
+          updateSectionsRemoveCount("removeLastestVideosFromSearch");
           handleSectionRemovedChange();          
 
           console.log("Latest videos section removed");
@@ -194,7 +205,7 @@ const removePreviouslyWatchedFromSearch = () => {
       if (span.innerText.includes("Previously watched")) {
         try {
           if (div.firstChild) { div.parentNode.removeChild(div) }
-          updateSectionsRemoveCount();
+          updateSectionsRemoveCount("removePreviouslyWatchedFromSearch");
           handleSectionRemovedChange();          
 
           console.log("Previously watched videos section removed");
@@ -219,7 +230,7 @@ const removeForYouFromSearch = () => {
       if (span.innerText.includes("For you")) {
         try {
           if (div.firstChild) { div.parentNode.removeChild(div) }
-          updateSectionsRemoveCount();
+          updateSectionsRemoveCount("removeForYouFromSearch");
           handleSectionRemovedChange();          
 
           console.log("For you section removed");
@@ -244,7 +255,7 @@ const removePeopleAlsoWatchedFromSearch = () => {
       if (span.innerText.includes("People also watched")) {
         try {
           if (div.firstChild) { div.parentNode.removeChild(div) }
-          updateSectionsRemoveCount();
+          updateSectionsRemoveCount("removePeopleAlsoWatchedFromSearch");
           handleSectionRemovedChange();          
 
           console.log("People also watched section removed");
@@ -269,7 +280,7 @@ const removeFromRelatedSearches = () => {
       if (span.innerText.includes("From related searches")) {
         try {
           if (div.firstChild) { div.parentNode.removeChild(div) }
-          updateSectionsRemoveCount();
+          updateSectionsRemoveCount("removeFromRelatedSearches");
           handleSectionRemovedChange();          
 
           console.log("From related searches removed");
@@ -294,7 +305,7 @@ const removePeopleAlsoSearchFor = () => {
       if (span.innerText.includes("People also search for")) {
         try {
           if (div.firstChild) { div.parentNode.removeChild(div) }
-          updateSectionsRemoveCount();
+          updateSectionsRemoveCount("removePeopleAlsoSearchFor");
           handleSectionRemovedChange();          
 
           console.log("People also search for section removed");
@@ -316,7 +327,7 @@ const removePeopleAlsoSearchFor = () => {
       if (span.innerText.includes("People also search for")) {
         try {
           if (div.firstChild) { div.parentNode.removeChild(div) }
-          updateSectionsRemoveCount();
+          updateSectionsRemoveCount("removePeopleAlsoSearchFor");
           handleSectionRemovedChange();          
 
           console.log("People also search for section removed");
@@ -331,8 +342,9 @@ const removePeopleAlsoSearchFor = () => {
 
 // Remove featured banners
 const removeFeaturedBanners = () => {
-  generalRemoveElement("ytd-statement-banner-renderer", "Featured Banner removed", "Error removing featured banner");
-  generalRemoveElement("ytd-brand-video-shelf-renderer", "Featured Banner removed", "Error removing featured banner");
+  generalRemoveElement("ytd-statement-banner-renderer", "Featured Banner removed", "Error removing featured banner", "removeFeaturedBanners");
+  generalRemoveElement("ytd-brand-video-shelf-renderer", "Featured Banner removed", "Error removing featured banner", "removeFeaturedBanners");
+  generalRemoveElement("ytd-banner-promo-renderer", "Promotional banner removed", "Error removing promotional banner", "removeFeaturedBanners");
 }
 
 // Remove Shorts Remixing This Video
@@ -347,7 +359,7 @@ const removeShortsRemixingThisVideo = () => {
       if (span.innerText.includes("Shorts remixing this video")) {
         try {
           if (div.firstChild) { div.parentNode.removeChild(div) }
-          updateSectionsRemoveCount();
+          updateSectionsRemoveCount("removeShortsRemixingThisVideo");
           handleSectionRemovedChange();          
 
           console.log("Shorts remixing this video section removed");
@@ -362,12 +374,12 @@ const removeShortsRemixingThisVideo = () => {
 
 // Remove popups
 const removePopups = () => {
-  generalRemoveElement("ytd-popup-container", "Removed Promotional Popup", "Error removing promotional popup");
+  generalRemoveElement("ytd-popup-container", "Removed Promotional Popup", "Error removing promotional popup", "removePopups");
 }
 
 // Remove ad companion slots
 const removeAdCompanions = () => {
-  generalRemoveElement("ytd-companion-slot-renderer", "Removed ad companion widget", "Error removing ad companion widget");
+  generalRemoveElement("ytd-companion-slot-renderer", "Removed ad companion widget", "Error removing ad companion widget", "removeAdCompanionSlots");
 }
 
 //MARK: END OF REMOVING FUNCTIONS
@@ -396,8 +408,8 @@ const handleSectionRemovedChange = (type?:String) => {
   }
 }
 
-// Update the sections removed ocunt when a section is removed
-const updateSectionsRemoveCount = async () => {
+// Update the sections removed ocunt when a section is removed + page change data
+const updateSectionsRemoveCount = async (type:string) => {
   let newSectionsRemovedPage = await getSectionsRemovedPage();
   let newSectionsRemovedTotal = await getSectionsRemovedTotal();
 
@@ -407,8 +419,8 @@ const updateSectionsRemoveCount = async () => {
   setSectionsRemovedPage(newSectionsRemovedPage);
   setSectionsRemovedTotal(newSectionsRemovedTotal);
 
-  console.log(newSectionsRemovedPage, newSectionsRemovedTotal);
-  
+  await incremementPageChangeStore(type);
+
   browser.runtime.sendMessage("BGupdateTabStore");
 }
 

@@ -46,7 +46,6 @@ let invalidateTimeout = setTimeout(async ()  => {
 browser.tabs.onUpdated.addListener(async function(tabId, changeInfo, tab) {
   if (changeInfo.status == "loading") {
     setSectionsRemovedPage(0);
-    console.log("SectionsREmovedPage Reset here");  
     try {
       browser.tabs.sendMessage(tabId, "tidyWhileLoading");
       setTimeout(null, 1000);
@@ -76,18 +75,18 @@ browser.tabs.onActivated.addListener(async function (activeInfo) {
 
 });
 
-// Tab close event (remove data for closed tab from tab store) [WORKING]
+// Tab close event (remove data for closed tab from tab store)
 browser.tabs.onRemoved.addListener(async function(tabId, removeInfo) {
   
   let tabStore = await getTabStore();
 
   if (tabStore[tabId]) {
     await removeTabFromStore(tabId);
-    console.log("Tab removed from tabStore");
   }
 
 });
 
+// Response functions
 const tabStoreUpdate = async () => {
   let sectionsRemovedPage = await getSectionsRemovedPage();
 
@@ -102,7 +101,6 @@ const tabStoreUpdate = async () => {
 // Message listners
 browser.runtime.onMessage.addListener((msg, sender) => {
   if (msg === "BGupdateTabStore") {
-    console.log("BGupdateTabStore");
     tabStoreUpdate();
   }
 })
